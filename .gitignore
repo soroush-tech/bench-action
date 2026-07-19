@@ -1,0 +1,5 @@
+# dist/ and vendor/ are committed on purpose — the action runs straight from
+# the repo checkout, so the bundle and the sandbox files must be in git.
+node_modules
+coverage
+*.log
