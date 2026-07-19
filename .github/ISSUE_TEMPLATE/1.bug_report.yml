@@ -1,0 +1,67 @@
+name: Bug report 🐛
+description: Create a bug report for bench-action.
+labels: ['status: needs triage']
+type: 'Bug'
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please provide a searchable summary of the issue in the title above ⬆️.
+
+        Thanks for contributing by creating an issue! ❤️
+  - type: checkboxes
+    attributes:
+      label: Duplicates
+      description: Please [search the history](https://github.com/soroush-tech/bench-action/issues) to see if an issue already exists for the same problem.
+      options:
+        - label: I have searched the existing issues
+          required: true
+  - type: checkboxes
+    attributes:
+      label: Latest version
+      description: We roll bug fixes and improvements into new releases.
+      options:
+        - label: I have tested the latest version
+          required: true
+  - type: textarea
+    attributes:
+      label: Steps to reproduce 🕹
+      description: |
+        **⚠️ Issues that we can't reproduce will be closed.**
+
+        Ideally link a workflow run (or a minimal repo) that shows the problem.
+      value: |
+        Link to failing workflow run:
+
+        Steps:
+
+        1.
+        2.
+        3.
+  - type: textarea
+    attributes:
+      label: Current behavior 😯
+      description: Describe what happens instead of the expected behavior. Include the relevant job-log excerpt and, if one was posted, the PR results comment.
+  - type: textarea
+    attributes:
+      label: Expected behavior 🤔
+      description: Describe what should happen.
+  - type: textarea
+    attributes:
+      label: Context 🔦
+      description: What are you trying to accomplish? Providing context helps us come up with a solution that is more useful in the real world.
+  - type: textarea
+    attributes:
+      label: Your environment 🌎
+      description: Runner and configuration details where the issue occurs.
+      value: |
+        <details>
+          <summary><code>Environment details</code></summary>
+
+        ```
+          - Runner (e.g. ubuntu-latest / self-hosted):
+          - Action version/ref (e.g. v1, SHA):
+          - Workflow `with:` inputs used:
+          - Bench file (or a minimal version of it):
+        ```
+        </details>

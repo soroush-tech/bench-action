@@ -1,0 +1,48 @@
+name: Task 🛠️
+description: Create a technical task with clear completion criteria.
+title: '[Task] '
+labels: ['type: task']
+type: 'Task'
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please write a concise, action-oriented task title above ⬆️.
+        Example: "Add a per-file min-ratio override input".
+
+  - type: textarea
+    attributes:
+      label: Task Description ✏️
+      description: |
+        Describe the technical or operational work needed.
+
+  - type: textarea
+    attributes:
+      label: Acceptance Criteria ✅
+      description: |
+        Define specific conditions that indicate this task is complete.
+        Keep these testable and measurable.
+
+  - type: textarea
+    attributes:
+      label: Dependencies 🔗
+      description: |
+        List any blocking issues or tasks that must be completed first.
+
+  - type: textarea
+    attributes:
+      label: Definition of Ready (DoR) 📋
+      description: |
+        What must be true before starting this task?
+
+  - type: textarea
+    attributes:
+      label: Definition of Done (DoD) 🏁
+      description: |
+        What must be true before closing this task? (e.g. tests at 100%, dist rebuilt and committed, release notes drafted)
+
+  - type: textarea
+    attributes:
+      label: Additional Notes or Resources 📎
+      description: |
+        Add any diagrams, documents, code references, or links relevant to this task.
