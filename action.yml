@@ -1,0 +1,46 @@
+name: 'Bench Gate'
+description: 'Run *.bench.ts benchmarks in a CPU/RAM-pinned Docker sandbox, fail below a minimum speed ratio, and comment results on the PR'
+author: 'soroush-tech'
+branding:
+  icon: 'zap'
+  color: 'yellow'
+inputs:
+  bench-dir:
+    description: 'Directory containing *.bench.ts files, relative to the workspace root'
+    required: true
+  files:
+    description: 'Optional newline- or comma-separated subset of file names (with or without the .bench.ts suffix) to run instead of every file in bench-dir'
+    required: false
+    default: ''
+  baseline-case:
+    description: 'Case key every other case is compared against'
+    required: true
+  min-ratio:
+    description: 'Minimum speed vs the baseline, in percent (e.g. 80); any case below it fails the action'
+    required: true
+  rounds:
+    description: 'Repeat each suite N times and gate on the median per case (recommended on shared runners)'
+    required: false
+    default: ''
+  cpus:
+    description: 'Sandbox CPU quota (docker --cpus)'
+    required: false
+    default: ''
+  cpuset:
+    description: 'Logical CPU(s) to pin the sandbox to (docker --cpuset-cpus)'
+    required: false
+    default: ''
+  memory:
+    description: 'Sandbox memory cap (docker --memory; swap is pinned to the same)'
+    required: false
+    default: ''
+  github-token:
+    description: 'Token used to post/update the PR results comment; omit to skip commenting'
+    required: false
+    default: ''
+outputs:
+  report:
+    description: 'The combined markdown report (also posted as the PR comment)'
+runs:
+  using: 'node20'
+  main: 'dist/index.cjs'
