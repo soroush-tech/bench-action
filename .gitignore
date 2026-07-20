@@ -1,5 +1,14 @@
-# dist/ and vendor/ are committed on purpose — the action runs straight from
-# the repo checkout, so the bundle and the sandbox files must be in git.
+# vendor/ is committed on purpose — the action runs straight from a release
+# tag's checkout, so the sandbox files must be in git. dist/ is NOT: the
+# Release workflow builds it and layers it onto the release tag's commit
+# (see .github/workflows/release.yml), so main stays TypeScript-only.
+# Root-anchored: vendor/dist/ IS committed.
+/dist/
 node_modules
 coverage
 *.log
+
+# IDE
+.idea
+.claude/*
+CLAUDE.md

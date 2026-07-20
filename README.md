@@ -6,10 +6,12 @@ Compiled GitHub Action that runs a directory of
 any case drops below a minimum speed ratio vs a baseline case, and posts the
 results as a single sticky **PR comment** (updated in place on every push).
 
-Everything is baked in — the bundled runner (`dist/index.cjs`) and the
-vendored sandbox (`vendor/Dockerfile` + `vendor/dist/harness.mjs`) are
-committed, and GitHub-hosted runners already ship Docker — so consuming it is
-one step, with no install, build, or Docker setup:
+Everything is baked in — every release tag carries the bundled runner
+(`dist/index.cjs`, built and attached by the Release workflow) and the
+vendored sandbox (`vendor/Dockerfile` + `vendor/dist/harness.mjs`), and
+GitHub-hosted runners already ship Docker — so consuming it is one step, with
+no install, build, or Docker setup (pin a release ref such as `@v1`; `@main`
+has no bundle and will not run):
 
 ```yaml
 jobs:
@@ -78,9 +80,10 @@ export default defineBench({
 
 ## Development
 
-The action runs straight from this repo's checkout, so `dist/` and `vendor/`
-are committed. After changing `src/`, run `npm run build` and commit the
-refreshed `dist/index.cjs` (CI fails if the bundle drifts from source).
+The action runs straight from a release tag's checkout. `vendor/` is
+committed; `dist/` is gitignored — CI builds it as a smoke test, and the
+Release workflow builds it from the released source and layers it onto the
+tag's commit, so `main` stays TypeScript-only.
 
 `vendor/` holds `@soroush.tech/bench`'s sandbox `Dockerfile` and its
 self-contained harness bundle. To pick up a new bench release:
@@ -91,9 +94,25 @@ npm run vendor
 npm run build
 ```
 
-and commit `vendor/` + `dist/` together. The small sandbox-driving modules in
+and commit `vendor/`. The small sandbox-driving modules in
 `src/sandbox/` mirror bench's `docker.ts`/`cli.ts` — diff them against the new
 release when re-vendoring.
 
 Bench-file `options.sandbox` defaults are **not** read by the action (that is
 a host-CLI convenience); sandbox settings come from the inputs above.
+
+## Releasing
+
+Releases are cut by the manual **Release** workflow (dispatch from `main`
+only), mirroring the monorepo's package flow: bump `version` in
+`package.json`, add the matching human-written `release-notes/<version>.md`,
+merge to `main`, then dispatch. The workflow builds `dist/` from the released
+source, creates a release commit carrying it on top of `main`'s head, tags
+`v<version>` on that commit + GitHub Release with the notes file verbatim,
+and force-moves the floating `v1` major tag consumers pin in `uses:` onto the
+same commit. Never hand-push release tags.
+
+The **first** GitHub Marketplace listing is a one-time manual step (edit the
+release in the web UI, tick "Publish this Action to the GitHub Marketplace",
+pick a category — requires 2FA); once listed, subsequent releases appear on
+the listing automatically.

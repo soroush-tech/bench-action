@@ -1,0 +1,107 @@
+name: Release
+
+# Releases are a deliberate act (mirrors the monorepo's cd-packages flow):
+# manual dispatch, main only. The version comes from package.json, the notes
+# come verbatim from release-notes/<version>.md — required before anything
+# ships. dist/ is gitignored on main: the workflow builds it here, layers it
+# onto main's head as a release commit via the git data API (no hand-pushed
+# tags, no push credentials in the checkout), tags vX.Y.Z on that commit, and
+# moves the floating major tag (v1) consumers pin in `uses:` onto it. Release
+# tags are therefore always one synthetic commit ahead of main.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # main-only: a release always comes off the CI-passed main branch, even
+    # though the dispatch UI lets you pick any ref.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release + move the major tag
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      # Resolve version + notes first so a run can never ship without
+      # human-written notes, and a rerun of an already-released version stops
+      # here instead of failing halfway.
+      - name: Resolve version and release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          test -f "release-notes/$VERSION.md" \
+            || { echo "::error::Missing release notes: release-notes/$VERSION.md"; exit 1; }
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Release v$VERSION already exists — bump the version to release."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The bundle is not committed — what ships is built right here from the
+      # released source.
+      - name: Build dist
+        run: npm run build
+
+      # Layer the fresh dist/ onto this commit server-side (blob → tree →
+      # commit via the git data API); the sanity check keeps a garbled script
+      # output from ever becoming a tag target.
+      - name: Create release commit with dist
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          RELEASE_SHA=$(node scripts/release-commit.mjs "chore(release): v$VERSION")
+          echo "$RELEASE_SHA" | grep -Eq '^[0-9a-f]{40}$' \
+            || { echo "::error::release-commit.mjs did not return a commit SHA: $RELEASE_SHA"; exit 1; }
+          echo "RELEASE_SHA=$RELEASE_SHA" >> "$GITHUB_ENV"
+          echo "Release commit: $RELEASE_SHA"
+
+      # Tag the release commit, then publish the release on that tag; notes
+      # are the in-repo file, verbatim.
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X POST "repos/${{ github.repository }}/git/refs" \
+            -f ref="refs/tags/v$VERSION" -f sha="$RELEASE_SHA"
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --notes-file "release-notes/$VERSION.md"
+
+      # Consumers pin `uses: soroush-tech/bench-action@v1`; move (or create)
+      # the floating major tag through the API — the checkout holds no
+      # credentials, so no git push here.
+      - name: Move major tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          major="v$(echo "$VERSION" | cut -d. -f1)"
+          # Singular `git/ref` on purpose: the plural `git/refs/tags/v1` is a
+          # prefix match and would 200 against the just-created v1.0.0 even
+          # when v1 itself doesn't exist, sending the first release down the
+          # PATCH path to a 422. The singular endpoint 404s correctly.
+          if gh api "repos/${{ github.repository }}/git/ref/tags/$major" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/${{ github.repository }}/git/refs/tags/$major" \
+              -f sha="$RELEASE_SHA" -F force=true
+          else
+            gh api -X POST "repos/${{ github.repository }}/git/refs" \
+              -f ref="refs/tags/$major" -f sha="$RELEASE_SHA"
+          fi
+          echo "### 🏷️ Released v$VERSION — \`$major\` now points here" >> "$GITHUB_STEP_SUMMARY"
