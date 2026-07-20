@@ -1,0 +1,30 @@
+{
+  "name": "bench-action",
+  "private": true,
+  "version": "1.0.0",
+  "description": "GitHub Action that runs *.bench.ts benchmarks in a CPU/RAM-pinned Docker sandbox, fails below a minimum speed ratio, and comments results on the PR.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/soroush-tech/bench-action.git"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/index.cjs",
+    "vendor": "node scripts/vendor.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "esbuild": "^0.28.1",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.10"
+  }
+}
