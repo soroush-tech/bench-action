@@ -3,11 +3,12 @@ name: Release
 # Releases are a deliberate act (mirrors the monorepo's cd-packages flow):
 # manual dispatch, main only. The version comes from package.json, the notes
 # come verbatim from release-notes/<version>.md — required before anything
-# ships. dist/ is gitignored on main: the workflow builds it here, layers it
-# onto main's head as a release commit via the git data API (no hand-pushed
-# tags, no push credentials in the checkout), tags vX.Y.Z on that commit, and
-# moves the floating major tag (v1) consumers pin in `uses:` onto it. Release
-# tags are therefore always one synthetic commit ahead of main.
+# ships. dist/ and vendor/ are gitignored on main: the workflow builds the
+# bundle and vendors the bench sandbox here, layers both onto main's head as
+# a release commit via the git data API (no hand-pushed tags, no push
+# credentials in the checkout), tags vX.Y.Z on that commit, and moves the
+# floating major tag (v1) consumers pin in `uses:` onto it. Release tags are
+# therefore always one synthetic commit ahead of main.
 on:
   workflow_dispatch:
 
@@ -55,10 +56,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The bundle is not committed — what ships is built right here from the
-      # released source.
+      # Neither the bundle nor the vendored sandbox is committed — what ships
+      # is built right here: dist/ from the released source, vendor/ from the
+      # pinned @soroush.tech/bench devDependency.
       - name: Build dist
         run: npm run build
+
+      - name: Vendor bench sandbox
+        run: |
+          npm run vendor
+          test -f vendor/Dockerfile
+          test -f vendor/dist/harness.mjs
 
       # Layer the fresh dist/ onto this commit server-side (blob → tree →
       # commit via the git data API); the sanity check keeps a garbled script

@@ -31,7 +31,14 @@ jobs:
       - name: Test with coverage
         run: npm run test:coverage
 
-      # dist/ is gitignored and built by the Release workflow at release time
-      # — this build is a smoke test that the bundle still compiles.
+      # dist/ and vendor/ are gitignored and produced by the Release workflow
+      # at release time — these are smoke tests that the bundle still compiles
+      # and the pinned bench package still vendors cleanly.
       - name: Build
         run: npm run build
+
+      - name: Vendor smoke test
+        run: |
+          npm run vendor
+          test -f vendor/Dockerfile
+          test -f vendor/dist/harness.mjs

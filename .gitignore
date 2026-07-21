@@ -1,9 +1,10 @@
-# vendor/ is committed on purpose — the action runs straight from a release
-# tag's checkout, so the sandbox files must be in git. dist/ is NOT: the
-# Release workflow builds it and layers it onto the release tag's commit
-# (see .github/workflows/release.yml), so main stays TypeScript-only.
-# Root-anchored: vendor/dist/ IS committed.
+# Neither dist/ (the action bundle, built from src/) nor vendor/ (bench's
+# sandbox Dockerfile + harness, copied from the pinned @soroush.tech/bench
+# devDependency via `npm run vendor`) is committed: the Release workflow
+# regenerates both and layers them onto the release tag's commit (see
+# .github/workflows/release.yml), so main stays TypeScript-only.
 /dist/
+/vendor/
 node_modules
 coverage
 *.log

@@ -80,23 +80,24 @@ export default defineBench({
 
 ## Development
 
-The action runs straight from a release tag's checkout. `vendor/` is
-committed; `dist/` is gitignored — CI builds it as a smoke test, and the
-Release workflow builds it from the released source and layers it onto the
+The action runs straight from a release tag's checkout. Neither `dist/` nor
+`vendor/` is committed — CI builds both as smoke tests, and the Release
+workflow regenerates them (the bundle from the released source, the sandbox
+from the pinned `@soroush.tech/bench` devDependency) and layers them onto the
 tag's commit, so `main` stays TypeScript-only.
 
 `vendor/` holds `@soroush.tech/bench`'s sandbox `Dockerfile` and its
-self-contained harness bundle. To pick up a new bench release:
+self-contained harness bundle, copied from the pinned devDependency by
+`npm run vendor`. To pick up a new bench release, bump the
+`@soroush.tech/bench` version in `package.json` (needs >= 2.1.0), then:
 
 ```sh
-npm install --no-save '@soroush.tech/bench@latest'   # needs >= 2.1.0
+npm install
 npm run vendor
-npm run build
 ```
 
-and commit `vendor/`. The small sandbox-driving modules in
-`src/sandbox/` mirror bench's `docker.ts`/`cli.ts` — diff them against the new
-release when re-vendoring.
+The small sandbox-driving modules in `src/sandbox/` mirror bench's
+`docker.ts`/`cli.ts` — diff them against the new release when re-vendoring.
 
 Bench-file `options.sandbox` defaults are **not** read by the action (that is
 a host-CLI convenience); sandbox settings come from the inputs above.
@@ -107,10 +108,11 @@ Releases are cut by the manual **Release** workflow (dispatch from `main`
 only), mirroring the monorepo's package flow: bump `version` in
 `package.json`, add the matching human-written `release-notes/<version>.md`,
 merge to `main`, then dispatch. The workflow builds `dist/` from the released
-source, creates a release commit carrying it on top of `main`'s head, tags
-`v<version>` on that commit + GitHub Release with the notes file verbatim,
-and force-moves the floating `v1` major tag consumers pin in `uses:` onto the
-same commit. Never hand-push release tags.
+source and `vendor/` from the pinned bench package, creates a release commit
+carrying both on top of `main`'s head, tags `v<version>` on that commit +
+GitHub Release with the notes file verbatim, and force-moves the floating
+`v1` major tag consumers pin in `uses:` onto the same commit. Never hand-push
+release tags.
 
 The **first** GitHub Marketplace listing is a one-time manual step (edit the
 release in the web UI, tick "Publish this Action to the GitHub Marketplace",
