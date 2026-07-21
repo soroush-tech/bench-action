@@ -7,6 +7,7 @@ import * as github from '@actions/github'
 import { closeResult, type Exec } from './sandbox/docker'
 import { buildReport, findReportComment, type FileResult } from './comment'
 import { parseFilesInput, selectBenchFiles } from './discover'
+import { postViaRelay } from './relay'
 import { resultFileName, runBenchFile } from './run-bench'
 
 /** Real process runner: inherits stdio so Docker/mitata output streams through. */
@@ -26,6 +27,32 @@ const exec: Exec = (command, args) =>
 const numberInput = (name: string): number | undefined => {
   const value = core.getInput(name)
   return value === '' ? undefined : Number(value)
+}
+
+/**
+ * Branded comment via the relay when possible (public app installed + `id-token: write`);
+ * any relay failure logs the reason and falls back to the direct github-token comment.
+ */
+async function postReport(report: string): Promise<void> {
+  const pr = github.context.payload.pull_request
+  if (core.getInput('branded') !== 'false' && pr !== undefined) {
+    try {
+      const { owner, repo } = github.context.repo
+      await postViaRelay(
+        { getIDToken: (audience) => core.getIDToken(audience), fetch: globalThis.fetch },
+        `${owner}/${repo}`,
+        pr.number,
+        report
+      )
+      core.info('Posted the branded PR comment via the relay.')
+      return
+    } catch (error) {
+      core.info(
+        `Branded comment unavailable (${error instanceof Error ? error.message : String(error)}) — falling back to github-token.`
+      )
+    }
+  }
+  await upsertComment(core.getInput('github-token'), report)
 }
 
 async function upsertComment(token: string, report: string): Promise<void> {
@@ -107,7 +134,7 @@ async function main(): Promise<void> {
   const report = buildReport(results, baselineCase, minRatio)
   core.setOutput('report', report)
   try {
-    await upsertComment(core.getInput('github-token'), report)
+    await postReport(report)
   } catch (error) {
     // A read-only token (e.g. a fork PR) must not decide the job — the gate does.
     core.warning(

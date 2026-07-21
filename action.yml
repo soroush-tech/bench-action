@@ -34,10 +34,14 @@ inputs:
     description: 'Sandbox memory cap (docker --memory; swap is pinned to the same)'
     required: false
     default: ''
-  github-token:
-    description: 'Token used to post/update the PR results comment; omit to skip commenting'
+  branded:
+    description: 'Post the PR comment through the bench relay as the bench bot (requires the public bench GitHub App installed on the repo and id-token: write on the job); any relay failure falls back to github-token. Set to false to always comment directly'
     required: false
-    default: ''
+    default: 'true'
+  github-token:
+    description: 'Token for the PR results comment when branded posting is unavailable. Defaults to the workflow runtime token; pass a GitHub App token to brand the fallback comment, or an empty string to skip commenting'
+    required: false
+    default: ${{ github.token }}
 outputs:
   report:
     description: 'The combined markdown report (also posted as the PR comment)'

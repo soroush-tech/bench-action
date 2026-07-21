@@ -20,6 +20,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write # for the results comment
+      id-token: write # for the branded (bench bot) comment; optional
     steps:
       - uses: actions/checkout@v5
       - uses: soroush-tech/bench-action@v1
@@ -28,8 +29,18 @@ jobs:
           baseline-case: previous
           min-ratio: '80'
           rounds: '5'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+The results comment needs no token setup. With the [bench GitHub App](https://github.com/apps/soroush-bench)
+installed on the repo and `id-token: write` granted (as above), the comment is
+posted **as the bench bot** (branded author) through the hosted relay at
+`api.bench.soroush.tech`. Without either, it falls back automatically to the
+workflow's runtime token (author `github-actions[bot]`, needs
+`pull-requests: write`). Pass `github-token` only to override the fallback: a
+GitHub App token of your own, or `''` to skip commenting entirely; set
+`branded: 'false'` to never use the relay. Fork PRs get no `id-token`
+permission, so they always take the fallback path — and the gate verdict is
+never affected by any comment failure.
 
 ## How the gate works
 
@@ -70,7 +81,8 @@ export default defineBench({
 | `cpus`          | no       | Sandbox CPU quota (`docker --cpus`; bench default `1`).                                                 |
 | `cpuset`        | no       | CPU pin (`docker --cpuset-cpus`; bench default `0`).                                                    |
 | `memory`        | no       | Memory cap (`docker --memory`, swap pinned equal; bench default `512m`).                                |
-| `github-token`  | no       | Token for the PR comment. Omit (or run off-PR) and the comment is skipped; the gate still applies.      |
+| `branded`       | no       | Default `'true'`: comment as the bench bot via the relay when the app + `id-token: write` allow it; otherwise fall back. `'false'` disables the relay. |
+| `github-token`  | no       | Fallback token for the PR comment; defaults to the runtime `github.token`. Pass `''` to skip commenting; off-PR runs skip it anyway. The gate always applies. |
 
 ## Outputs
 
