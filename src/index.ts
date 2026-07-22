@@ -150,6 +150,13 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  core.setFailed(error instanceof Error ? error.message : String(error))
-})
+// No top-level await: the bundle is CJS (esbuild --format=cjs), which forbids it.
+async function run(): Promise<void> {
+  try {
+    await main()
+  } catch (error) {
+    core.setFailed(error instanceof Error ? error.message : String(error))
+  }
+}
+
+void run()

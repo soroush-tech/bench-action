@@ -22,8 +22,10 @@ jobs:
           node-version: 20
           cache: npm
 
+      # --ignore-scripts: no dependency here needs lifecycle scripts (esbuild's
+      # binary arrives via optionalDependencies), so don't let any run.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Typecheck
         run: npm run typecheck

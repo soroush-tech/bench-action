@@ -52,4 +52,10 @@ for (const path of [...walk('dist'), ...walk('vendor')]) {
 const parent = await api('GET', `git/commits/${GITHUB_SHA}`)
 const { sha: treeSha } = await api('POST', 'git/trees', { base_tree: parent.tree.sha, tree })
 const commit = await api('POST', 'git/commits', { message, tree: treeSha, parents: [GITHUB_SHA] })
-console.log(commit.sha)
+// Print only a validated SHA — stdout is captured into $RELEASE_SHA and
+// becomes a tag target, so nothing unvalidated may reach it.
+const sha = /^[0-9a-f]{40}$/.exec(String(commit.sha))?.[0]
+if (sha === undefined) {
+  throw new Error('git/commits returned an invalid sha')
+}
+console.log(sha)

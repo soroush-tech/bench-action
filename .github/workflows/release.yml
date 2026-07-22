@@ -53,8 +53,10 @@ jobs:
           node-version: 20
           cache: npm
 
+      # --ignore-scripts: no dependency here needs lifecycle scripts (esbuild's
+      # binary arrives via optionalDependencies), so don't let any run.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # Neither the bundle nor the vendored sandbox is committed — what ships
       # is built right here: dist/ from the released source, vendor/ from the
