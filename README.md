@@ -11,7 +11,9 @@ Everything is baked in — every release tag carries the bundled runner
 vendored sandbox (`vendor/Dockerfile` + `vendor/dist/harness.mjs`), and
 GitHub-hosted runners already ship Docker — so consuming it is one step, with
 no install, build, or Docker setup (pin a release ref such as `@v1`; `@main`
-has no bundle and will not run):
+has no bundle and will not run). The action declares the `node24` runtime:
+any GitHub-hosted runner qualifies; self-hosted runners need a version recent
+enough to ship node24.
 
 ```yaml
 jobs:
