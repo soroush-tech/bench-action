@@ -2,6 +2,8 @@
 export const RELAY_URL = 'https://api.bench.soroush.tech/v1/report'
 /** Fixed audience the OIDC token is requested with; the relay verifies it. */
 export const OIDC_AUDIENCE = 'soroush-bench-action'
+/** Deadline for the relay round-trip — a stalled relay must not hold up the fallback. */
+export const RELAY_TIMEOUT_MS = 10_000
 
 export interface RelayDeps {
   /** `core.getIDToken` — rejects when the job lacks `id-token: write`. */
@@ -25,6 +27,7 @@ export async function postViaRelay(
     method: 'POST',
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify({ repository, prNumber, body }),
+    signal: AbortSignal.timeout(RELAY_TIMEOUT_MS),
   })
   if (res.status === 404) {
     throw new Error(`the bench GitHub App is not installed on ${repository}`)

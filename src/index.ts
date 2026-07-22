@@ -35,7 +35,14 @@ const numberInput = (name: string): number | undefined => {
  */
 async function postReport(report: string): Promise<void> {
   const pr = github.context.payload.pull_request
-  if (core.getInput('branded') !== 'false' && pr !== undefined) {
+  const token = core.getInput('github-token')
+  // An explicit '' github-token opts out of commenting entirely — including
+  // the branded relay, which otherwise needs no token at all.
+  if (token === '' || pr === undefined) {
+    core.info('No PR context or github-token — skipping the PR comment.')
+    return
+  }
+  if (core.getInput('branded') !== 'false') {
     try {
       const { owner, repo } = github.context.repo
       await postViaRelay(
@@ -52,28 +59,23 @@ async function postReport(report: string): Promise<void> {
       )
     }
   }
-  await upsertComment(core.getInput('github-token'), report)
+  await upsertComment(token, pr.number, report)
 }
 
-async function upsertComment(token: string, report: string): Promise<void> {
-  const pr = github.context.payload.pull_request
-  if (token === '' || pr === undefined) {
-    core.info('No PR context or github-token — skipping the PR comment.')
-    return
-  }
+async function upsertComment(token: string, prNumber: number, report: string): Promise<void> {
   const octokit = github.getOctokit(token)
   const { owner, repo } = github.context.repo
   const comments = await octokit.rest.issues.listComments({
     owner,
     repo,
-    issue_number: pr.number,
+    issue_number: prNumber,
     per_page: 100,
   })
   const existing = findReportComment(comments.data)
   if (existing) {
     await octokit.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: report })
   } else {
-    await octokit.rest.issues.createComment({ owner, repo, issue_number: pr.number, body: report })
+    await octokit.rest.issues.createComment({ owner, repo, issue_number: prNumber, body: report })
   }
 }
 

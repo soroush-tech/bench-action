@@ -76,7 +76,8 @@ jobs:
         id: release-commit
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/release-commit.mjs "chore(release): v$VERSION"
+        run: |
+          node scripts/release-commit.mjs "chore(release): v$VERSION"
 
       # Tag the release commit, then publish the release on that tag; notes
       # are the in-repo file, verbatim. Belt-and-braces: re-check the SHA

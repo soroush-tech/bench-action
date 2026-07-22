@@ -24,6 +24,15 @@ describe('postViaRelay', () => {
     })
   })
 
+  it('bounds the request with a timeout signal so a stalled relay cannot block the fallback', async () => {
+    const { deps: d, fetch } = deps()
+
+    await postViaRelay(d, 'o/r', 5, 'the report')
+
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    expect(init.signal).toBeInstanceOf(AbortSignal)
+  })
+
   it('names the missing app installation on a 404', async () => {
     const { deps: d } = deps(404)
     await expect(postViaRelay(d, 'o/r', 5, 'x')).rejects.toThrow(
