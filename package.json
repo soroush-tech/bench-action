@@ -10,7 +10,7 @@
   },
   "type": "module",
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/index.cjs",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist/index.cjs",
     "vendor": "node scripts/vendor.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

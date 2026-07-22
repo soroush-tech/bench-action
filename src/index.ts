@@ -161,5 +161,5 @@ async function run(): Promise<void> {
 }
 
 // Top-level await (S7785) is impossible here: the bundle is CJS
-// (esbuild --format=cjs, what action.yml's node20 runner executes).
+// (esbuild --format=cjs, what action.yml's node24 runner executes).
 void run() // NOSONAR
