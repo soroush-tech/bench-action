@@ -39,8 +39,7 @@ jobs:
       - name: Build
         run: npm run build
 
+      # vendor.mjs itself fails loudly if the package or either file is
+      # missing — no extra existence checks needed here.
       - name: Vendor smoke test
-        run: |
-          npm run vendor
-          test -f vendor/Dockerfile
-          test -f vendor/dist/harness.mjs
+        run: npm run vendor

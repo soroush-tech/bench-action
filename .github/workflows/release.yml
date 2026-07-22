@@ -64,11 +64,10 @@ jobs:
       - name: Build dist
         run: npm run build
 
+      # vendor.mjs itself fails loudly if the package or either file is
+      # missing — a broken vendor can never ship silently.
       - name: Vendor bench sandbox
-        run: |
-          npm run vendor
-          test -f vendor/Dockerfile
-          test -f vendor/dist/harness.mjs
+        run: npm run vendor
 
       # Layer the fresh dist/ + vendor/ onto this commit server-side (blob →
       # tree → commit via the git data API); the script validates the SHA and
