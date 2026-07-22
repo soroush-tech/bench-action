@@ -4,14 +4,15 @@
 // are gitignored on main — release tags are the only refs that carry them —
 // and going through the API keeps push credentials out of the checkout
 // (same reason release.yml moves the floating major tag with `gh api`).
-// Prints the new commit SHA and nothing else: the workflow captures stdout
-// into $RELEASE_SHA.
-import { readFileSync, readdirSync } from 'node:fs'
+// The new commit SHA is exposed as the step output `sha` via $GITHUB_OUTPUT.
+import { appendFileSync, readFileSync, readdirSync } from 'node:fs'
 
-const { GITHUB_TOKEN, GITHUB_REPOSITORY, GITHUB_SHA } = process.env
+const { GITHUB_TOKEN, GITHUB_REPOSITORY, GITHUB_SHA, GITHUB_OUTPUT } = process.env
 const message = process.argv[2]
-if (!GITHUB_TOKEN || !GITHUB_REPOSITORY || !GITHUB_SHA || !message) {
-  console.error('usage: GITHUB_TOKEN/GITHUB_REPOSITORY/GITHUB_SHA env vars + commit message argument')
+if (!GITHUB_TOKEN || !GITHUB_REPOSITORY || !GITHUB_SHA || !GITHUB_OUTPUT || !message) {
+  console.error(
+    'usage: GITHUB_TOKEN/GITHUB_REPOSITORY/GITHUB_SHA/GITHUB_OUTPUT env vars + commit message argument'
+  )
   process.exit(1)
 }
 
@@ -52,10 +53,9 @@ for (const path of [...walk('dist'), ...walk('vendor')]) {
 const parent = await api('GET', `git/commits/${GITHUB_SHA}`)
 const { sha: treeSha } = await api('POST', 'git/trees', { base_tree: parent.tree.sha, tree })
 const commit = await api('POST', 'git/commits', { message, tree: treeSha, parents: [GITHUB_SHA] })
-// Print only a validated SHA — stdout is captured into $RELEASE_SHA and
-// becomes a tag target, so nothing unvalidated may reach it.
+// Only a validated SHA may become a tag target downstream.
 const sha = /^[0-9a-f]{40}$/.exec(String(commit.sha))?.[0]
 if (sha === undefined) {
   throw new Error('git/commits returned an invalid sha')
 }
-console.log(sha)
+appendFileSync(GITHUB_OUTPUT, `sha=${sha}\n`)
