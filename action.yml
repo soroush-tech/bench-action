@@ -1,9 +1,9 @@
-name: 'Bench Gate'
+name: 'soroush-bench'
 description: 'Run *.bench.ts benchmarks in a CPU/RAM-pinned Docker sandbox, fail below a minimum speed ratio, and comment results on the PR'
 author: 'soroush-tech'
 branding:
   icon: 'zap'
-  color: 'yellow'
+  color: 'green'
 inputs:
   bench-dir:
     description: 'Directory containing *.bench.ts files, relative to the workspace root'
