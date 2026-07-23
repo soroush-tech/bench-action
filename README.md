@@ -138,6 +138,7 @@ the listing automatically.
 Bugs and questions → [GitHub Issues](https://github.com/soroush-tech/bench-action/issues)
 or **support@soroush.tech**.
 
-Privacy: see [PRIVACY.md](./PRIVACY.md) — in short, the action runs entirely
-in your workflow, and the optional branded-comment relay is stateless and
-stores nothing.
+Privacy: see [PRIVACY.md](./PRIVACY.md) — in short, the action runs in your
+workflow, and the optional branded-comment relay keeps no application or
+database storage of your data (PRIVACY.md details what it receives and how
+long operational logs are retained).
