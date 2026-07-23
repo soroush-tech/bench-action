@@ -5,6 +5,10 @@ Compiled GitHub Action that runs a directory of
 `*.bench.ts` files inside the CPU/RAM-pinned Docker sandbox, **fails CI** when
 any case drops below a minimum speed ratio vs a baseline case, and posts the
 results as a single sticky **PR comment** (updated in place on every push).
+Listed on the GitHub Marketplace as
+**[soroush-bench](https://github.com/marketplace/actions/soroush-bench)** —
+the same name as the [bench GitHub App](https://github.com/apps/soroush-bench)
+that brands its PR comments.
 
 Everything is baked in — every release tag carries the bundled runner
 (`dist/index.cjs`, built and attached by the Release workflow) and the
