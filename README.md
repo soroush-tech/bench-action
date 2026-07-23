@@ -132,3 +132,13 @@ The **first** GitHub Marketplace listing is a one-time manual step (edit the
 release in the web UI, tick "Publish this Action to the GitHub Marketplace",
 pick a category — requires 2FA); once listed, subsequent releases appear on
 the listing automatically.
+
+## Support & privacy
+
+Bugs and questions → [GitHub Issues](https://github.com/soroush-tech/bench-action/issues)
+or **support@soroush.tech**.
+
+Privacy: see [PRIVACY.md](./PRIVACY.md) — in short, the action runs in your
+workflow, and the optional branded-comment relay keeps no application or
+database storage of your data (PRIVACY.md details what it receives and how
+long operational logs are retained).
