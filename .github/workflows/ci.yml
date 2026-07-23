@@ -19,11 +19,13 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
+      # --ignore-scripts: no dependency here needs lifecycle scripts (esbuild's
+      # binary arrives via optionalDependencies), so don't let any run.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Typecheck
         run: npm run typecheck
@@ -37,8 +39,7 @@ jobs:
       - name: Build
         run: npm run build
 
+      # vendor.mjs itself fails loudly if the package or either file is
+      # missing — no extra existence checks needed here.
       - name: Vendor smoke test
-        run: |
-          npm run vendor
-          test -f vendor/Dockerfile
-          test -f vendor/dist/harness.mjs
+        run: npm run vendor

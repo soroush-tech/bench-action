@@ -7,6 +7,7 @@ import * as github from '@actions/github'
 import { closeResult, type Exec } from './sandbox/docker'
 import { buildReport, findReportComment, type FileResult } from './comment'
 import { parseFilesInput, selectBenchFiles } from './discover'
+import { postViaRelay } from './relay'
 import { resultFileName, runBenchFile } from './run-bench'
 
 /** Real process runner: inherits stdio so Docker/mitata output streams through. */
@@ -28,25 +29,53 @@ const numberInput = (name: string): number | undefined => {
   return value === '' ? undefined : Number(value)
 }
 
-async function upsertComment(token: string, report: string): Promise<void> {
+/**
+ * Branded comment via the relay when possible (public app installed + `id-token: write`);
+ * any relay failure logs the reason and falls back to the direct github-token comment.
+ */
+async function postReport(report: string): Promise<void> {
   const pr = github.context.payload.pull_request
+  const token = core.getInput('github-token')
+  // An explicit '' github-token opts out of commenting entirely — including
+  // the branded relay, which otherwise needs no token at all.
   if (token === '' || pr === undefined) {
     core.info('No PR context or github-token — skipping the PR comment.')
     return
   }
+  if (core.getInput('branded') !== 'false') {
+    try {
+      const { owner, repo } = github.context.repo
+      await postViaRelay(
+        { getIDToken: (audience) => core.getIDToken(audience), fetch: globalThis.fetch },
+        `${owner}/${repo}`,
+        pr.number,
+        report
+      )
+      core.info('Posted the branded PR comment via the relay.')
+      return
+    } catch (error) {
+      core.info(
+        `Branded comment unavailable (${error instanceof Error ? error.message : String(error)}) — falling back to github-token.`
+      )
+    }
+  }
+  await upsertComment(token, pr.number, report)
+}
+
+async function upsertComment(token: string, prNumber: number, report: string): Promise<void> {
   const octokit = github.getOctokit(token)
   const { owner, repo } = github.context.repo
   const comments = await octokit.rest.issues.listComments({
     owner,
     repo,
-    issue_number: pr.number,
+    issue_number: prNumber,
     per_page: 100,
   })
   const existing = findReportComment(comments.data)
   if (existing) {
     await octokit.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: report })
   } else {
-    await octokit.rest.issues.createComment({ owner, repo, issue_number: pr.number, body: report })
+    await octokit.rest.issues.createComment({ owner, repo, issue_number: prNumber, body: report })
   }
 }
 
@@ -107,7 +136,7 @@ async function main(): Promise<void> {
   const report = buildReport(results, baselineCase, minRatio)
   core.setOutput('report', report)
   try {
-    await upsertComment(core.getInput('github-token'), report)
+    await postReport(report)
   } catch (error) {
     // A read-only token (e.g. a fork PR) must not decide the job — the gate does.
     core.warning(
@@ -123,6 +152,14 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  core.setFailed(error instanceof Error ? error.message : String(error))
-})
+async function run(): Promise<void> {
+  try {
+    await main()
+  } catch (error) {
+    core.setFailed(error instanceof Error ? error.message : String(error))
+  }
+}
+
+// Top-level await (S7785) is impossible here: the bundle is CJS
+// (esbuild --format=cjs, what action.yml's node24 runner executes).
+void run() // NOSONAR

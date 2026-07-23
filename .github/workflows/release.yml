@@ -50,11 +50,13 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
+      # --ignore-scripts: no dependency here needs lifecycle scripts (esbuild's
+      # binary arrives via optionalDependencies), so don't let any run.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # Neither the bundle nor the vendored sandbox is committed — what ships
       # is built right here: dist/ from the released source, vendor/ from the
@@ -62,31 +64,31 @@ jobs:
       - name: Build dist
         run: npm run build
 
+      # vendor.mjs itself fails loudly if the package or either file is
+      # missing — a broken vendor can never ship silently.
       - name: Vendor bench sandbox
-        run: |
-          npm run vendor
-          test -f vendor/Dockerfile
-          test -f vendor/dist/harness.mjs
+        run: npm run vendor
 
-      # Layer the fresh dist/ onto this commit server-side (blob → tree →
-      # commit via the git data API); the sanity check keeps a garbled script
-      # output from ever becoming a tag target.
+      # Layer the fresh dist/ + vendor/ onto this commit server-side (blob →
+      # tree → commit via the git data API); the script validates the SHA and
+      # exposes it as the step output `sha`.
       - name: Create release commit with dist
+        id: release-commit
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          RELEASE_SHA=$(node scripts/release-commit.mjs "chore(release): v$VERSION")
-          echo "$RELEASE_SHA" | grep -Eq '^[0-9a-f]{40}$' \
-            || { echo "::error::release-commit.mjs did not return a commit SHA: $RELEASE_SHA"; exit 1; }
-          echo "RELEASE_SHA=$RELEASE_SHA" >> "$GITHUB_ENV"
-          echo "Release commit: $RELEASE_SHA"
+          node scripts/release-commit.mjs "chore(release): v$VERSION"
 
       # Tag the release commit, then publish the release on that tag; notes
-      # are the in-repo file, verbatim.
+      # are the in-repo file, verbatim. Belt-and-braces: re-check the SHA
+      # shape before it becomes a tag target.
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ steps.release-commit.outputs.sha }}
         run: |
+          echo "$RELEASE_SHA" | grep -Eq '^[0-9a-f]{40}$' \
+            || { echo "::error::release-commit.mjs did not produce a commit SHA"; exit 1; }
           gh api -X POST "repos/${{ github.repository }}/git/refs" \
             -f ref="refs/tags/v$VERSION" -f sha="$RELEASE_SHA"
           gh release create "v$VERSION" \
@@ -99,6 +101,7 @@ jobs:
       - name: Move major tag
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ steps.release-commit.outputs.sha }}
         run: |
           major="v$(echo "$VERSION" | cut -d. -f1)"
           # Singular `git/ref` on purpose: the plural `git/refs/tags/v1` is a
