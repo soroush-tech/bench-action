@@ -57,7 +57,8 @@ export function commentMarker(title: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .slice(0, 64)
-    .replace(/^-+|-+$/g, '')
+    // Runs are already one dash each, so at most one dash sits at either end.
+    .replace(/^-|-$/g, '')
   if (slug === '') {
     throw new Error(`bench-action: comment-title "${title}" has no letters or digits to key it by`)
   }
