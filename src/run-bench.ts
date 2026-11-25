@@ -15,7 +15,7 @@ export interface RunSpec {
   workspace: string
   /** Directory holding the vendored Dockerfile + dist/harness.mjs. */
   vendorDir: string
-  /** Writable host directory mounted at {@link OUT_MOUNT} for `--md-file`. */
+  /** Writable host directory mounted at {@link OUT_MOUNT} for `--md-file` and `--json-file`. */
   outDir: string
   baselineCase: string
   minRatio: number
@@ -26,11 +26,12 @@ export interface RunSpec {
 }
 
 /**
- * Flattens a bench file path into the name its results table is written
- * under, so files from nested directories cannot collide in the out dir.
+ * Flattens a bench file path into the name its results (the `md` table or the
+ * `json` numbers) are written under, so files from nested directories cannot
+ * collide in the out dir.
  */
-export function resultFileName(benchFile: string): string {
-  return `${benchFile.replace(/[\\/]/g, '__')}.md`
+export function resultFileName(benchFile: string, ext: 'md' | 'json'): string {
+  return `${benchFile.replace(/[\\/]/g, '__')}.${ext}`
 }
 
 /**
@@ -46,7 +47,8 @@ export function toCliOptions(spec: RunSpec): CliOptions {
     imageTag: 'soroush-bench:latest',
     mounts: [`${spec.outDir}:${OUT_MOUNT}`],
     md: false,
-    mdFile: `${OUT_MOUNT}/${resultFileName(spec.benchFile)}`,
+    mdFile: `${OUT_MOUNT}/${resultFileName(spec.benchFile, 'md')}`,
+    jsonFile: `${OUT_MOUNT}/${resultFileName(spec.benchFile, 'json')}`,
     rounds: spec.rounds ?? 1,
     gcInner: false,
     baselineCase: spec.baselineCase,

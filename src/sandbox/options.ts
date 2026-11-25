@@ -14,6 +14,8 @@ export interface CliOptions {
   md: boolean
   /** Container path the markdown results table is also written to. */
   mdFile?: string
+  /** Container path the JSON results are written to. */
+  jsonFile?: string
   rounds: number
   gcInner: boolean
   /** Case key the ratio gate compares every other case against. */
@@ -44,6 +46,7 @@ export function resolveSandboxOptions(
     extraMounts: cli.mounts,
     md: cli.md,
     mdFile: cli.mdFile,
+    jsonFile: cli.jsonFile,
     rounds: cli.rounds,
     gcInner: cli.gcInner,
     baselineCase: cli.baselineCase,

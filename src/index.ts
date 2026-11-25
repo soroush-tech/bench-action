@@ -5,7 +5,15 @@ import { join } from 'node:path'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import { closeResult, type Exec } from './sandbox/docker'
-import { buildReport, findReportComment, type FileResult } from './comment'
+import {
+  DEFAULT_TITLE,
+  buildReport,
+  commentMarker,
+  findReportComment,
+  parseCommentDetails,
+  type BenchJson,
+  type FileResult,
+} from './comment'
 import { parseFilesInput, selectBenchFiles } from './discover'
 import { postViaRelay } from './relay'
 import { resultFileName, runBenchFile } from './run-bench'
@@ -33,7 +41,7 @@ const numberInput = (name: string): number | undefined => {
  * Branded comment via the relay when possible (public app installed + `id-token: write`);
  * any relay failure logs the reason and falls back to the direct github-token comment.
  */
-async function postReport(report: string): Promise<void> {
+async function postReport(report: string, marker: string): Promise<void> {
   const pr = github.context.payload.pull_request
   const token = core.getInput('github-token')
   // An explicit '' github-token opts out of commenting entirely — including
@@ -59,10 +67,15 @@ async function postReport(report: string): Promise<void> {
       )
     }
   }
-  await upsertComment(token, pr.number, report)
+  await upsertComment(token, pr.number, report, marker)
 }
 
-async function upsertComment(token: string, prNumber: number, report: string): Promise<void> {
+async function upsertComment(
+  token: string,
+  prNumber: number,
+  report: string,
+  marker: string
+): Promise<void> {
   const octokit = github.getOctokit(token)
   const { owner, repo } = github.context.repo
   const comments = await octokit.rest.issues.listComments({
@@ -71,7 +84,7 @@ async function upsertComment(token: string, prNumber: number, report: string): P
     issue_number: prNumber,
     per_page: 100,
   })
-  const existing = findReportComment(comments.data)
+  const existing = findReportComment(comments.data, marker)
   if (existing) {
     await octokit.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: report })
   } else {
@@ -86,6 +99,10 @@ async function main(): Promise<void> {
   if (!Number.isFinite(minRatio) || minRatio <= 0) {
     throw new Error('bench-action: min-ratio must be a positive number (percent)')
   }
+  // Validated before any bench runs, so a typo fails fast instead of after the suite.
+  const details = parseCommentDetails(core.getInput('comment-details') || 'collapsed')
+  const title = core.getInput('comment-title') || DEFAULT_TITLE
+  const marker = commentMarker(title)
 
   const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd()
   const selection = parseFilesInput(core.getInput('files'))
@@ -126,17 +143,23 @@ async function main(): Promise<void> {
     )
     let table = ''
     try {
-      table = readFileSync(join(outDir, resultFileName(benchFile)), 'utf8').trim()
+      table = readFileSync(join(outDir, resultFileName(benchFile, 'md')), 'utf8').trim()
     } catch {
       core.warning(`No results table was produced for ${benchFile}.`)
     }
-    results.push({ file: benchFile, passed, table })
+    let json: BenchJson | undefined
+    try {
+      json = JSON.parse(readFileSync(join(outDir, resultFileName(benchFile, 'json')), 'utf8'))
+    } catch {
+      core.warning(`No JSON results were produced for ${benchFile}.`)
+    }
+    results.push({ file: benchFile, passed, table, json })
   }
 
-  const report = buildReport(results, baselineCase, minRatio)
+  const report = buildReport(results, { baselineCase, minRatio, title, details })
   core.setOutput('report', report)
   try {
-    await postReport(report)
+    await postReport(report, marker)
   } catch (error) {
     // A read-only token (e.g. a fork PR) must not decide the job — the gate does.
     core.warning(
