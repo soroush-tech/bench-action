@@ -87,6 +87,8 @@ export default defineBench({
 | `cpus`          | no       | Sandbox CPU quota (`docker --cpus`; bench default `1`).                                                 |
 | `cpuset`        | no       | CPU pin (`docker --cpuset-cpus`; bench default `0`).                                                    |
 | `memory`        | no       | Memory cap (`docker --memory`, swap pinned equal; bench default `512m`).                                |
+| `comment-details` | no   | Default `collapsed`: each file's own table sits in a closed `<details>` under the summary. `open` shows them expanded, `none` leaves them out. |
+| `comment-title` | no       | Default `Benchmark results`. Any other title gets its own marker, so two jobs on one PR (e.g. Node and browser benches) keep separate comments. |
 | `branded`       | no       | Default `'true'`: comment as the bench bot via the relay when the app + `id-token: write` allow it; otherwise fall back. `'false'` disables the relay. |
 | `github-token`  | no       | Fallback token for the PR comment; defaults to the runtime `github.token`. Pass `''` to skip commenting; off-PR runs skip it anyway. The gate always applies. |
 

@@ -30,6 +30,8 @@ export interface SandboxOptions {
    * read-only and `/bench` is a tmpfs that dies with the container.
    */
   mdFile?: string
+  /** Container path the JSON results are written to; same mount rules as `mdFile`. */
+  jsonFile?: string
   /** Repeat the whole suite this many times and report the median per case. */
   rounds: number
   /** Run GC before each iteration (mitata `gc('inner')`) for a per-iter GC row. */
@@ -78,6 +80,7 @@ export function buildRunArgs(opts: SandboxOptions): string[] {
     `/repo/${opts.benchRelPath}`,
     ...(opts.md ? ['--md'] : []),
     ...(opts.mdFile !== undefined ? ['--md-file', opts.mdFile] : []),
+    ...(opts.jsonFile !== undefined ? ['--json-file', opts.jsonFile] : []),
     ...(opts.rounds > 1 ? ['--rounds', String(opts.rounds)] : []),
     ...(opts.gcInner ? ['--gc-inner'] : []),
     ...(opts.baselineCase !== undefined ? ['--baseline-case', opts.baselineCase] : []),

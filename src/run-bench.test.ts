@@ -12,13 +12,13 @@ const spec: RunSpec = {
 
 describe('resultFileName', () => {
   it('flattens path separators so nested files cannot collide', () => {
-    expect(resultFileName('bench/color.bench.ts')).toBe('bench__color.bench.ts.md')
-    expect(resultFileName('bench\\color.bench.ts')).toBe('bench__color.bench.ts.md')
+    expect(resultFileName('bench/color.bench.ts', 'md')).toBe('bench__color.bench.ts.md')
+    expect(resultFileName('bench\\color.bench.ts', 'json')).toBe('bench__color.bench.ts.json')
   })
 })
 
 describe('toCliOptions', () => {
-  it('mounts the out dir, targets the md file inside it, and applies bench defaults', () => {
+  it('mounts the out dir, targets the md and json files inside it, and applies bench defaults', () => {
     expect(toCliOptions(spec)).toEqual({
       benchFile: 'bench/color.bench.ts',
       cpus: 1,
@@ -28,6 +28,7 @@ describe('toCliOptions', () => {
       mounts: [`/tmp/out:${OUT_MOUNT}`],
       md: false,
       mdFile: `${OUT_MOUNT}/bench__color.bench.ts.md`,
+      jsonFile: `${OUT_MOUNT}/bench__color.bench.ts.json`,
       rounds: 1,
       gcInner: false,
       baselineCase: 'previous',
@@ -49,7 +50,7 @@ describe('runBenchFile', () => {
     expect(exec).toHaveBeenCalledTimes(2)
     const runArgs = exec.mock.calls[1][1] as string[]
     expect(runArgs).toEqual(
-      expect.arrayContaining(['--baseline-case', 'previous', '--min-ratio', '80', '--md-file'])
+      expect.arrayContaining(['--baseline-case', 'previous', '--min-ratio', '80', '--md-file', '--json-file'])
     )
     expect(runArgs).toEqual(expect.arrayContaining(['-v', `/tmp/out:${OUT_MOUNT}`]))
   })

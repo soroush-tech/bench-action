@@ -83,6 +83,12 @@ describe('buildRunArgs', () => {
     expect(buildRunArgs(opts)).not.toContain('--md-file')
   })
 
+  it('appends --json-file with its path when set, and omits it otherwise', () => {
+    const args = buildRunArgs({ ...opts, jsonFile: '/mnt/out/results.json' })
+    expect(args.slice(-2)).toEqual(['--json-file', '/mnt/out/results.json'])
+    expect(buildRunArgs(opts)).not.toContain('--json-file')
+  })
+
   it('appends the ratio-gate flags when set, and omits them otherwise', () => {
     const args = buildRunArgs({ ...opts, baselineCase: 'upstream', minRatio: 80 })
     expect(args.slice(-4)).toEqual(['--baseline-case', 'upstream', '--min-ratio', '80'])
