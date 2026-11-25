@@ -122,11 +122,12 @@ async function main(): Promise<void> {
   chmodSync(outDir, 0o777)
 
   // Sequential on purpose: parallel sandboxes would contend for the pinned CPU.
+  // S9382 (await in a loop) is suppressed below for that reason.
   const results: FileResult[] = []
   for (const file of selected) {
     const benchFile = `${benchDir}/${file}`.replaceAll('\\', '/')
     core.info(`Running ${benchFile}…`)
-    const { passed } = await runBenchFile(
+    const { passed } = await runBenchFile( // NOSONAR
       {
         benchFile,
         workspace,
