@@ -10,8 +10,21 @@ export const MAX_COMMENT_LENGTH = 65_536
 /** How the per-file tables appear under the summary (`comment-details`). */
 export type CommentDetails = 'collapsed' | 'open' | 'none'
 
+/** What produced a run, as bench (>= 2.4.0) records it in `--json-file`. */
+export interface BenchEnv {
+  /** Version of the bench harness that ran. */
+  bench: string
+  /** The sandbox's Node version. */
+  node: string
+  cpus?: number
+  cpuset?: string
+  memory?: string
+}
+
 /** The part of bench's `--json-file` results the summary reads. */
 export interface BenchJson {
+  /** What produced the run; absent from results of bench before 2.4.0. */
+  env?: BenchEnv
   /** Key of the baseline case, when bench found it. */
   baseline?: string
   cases: {
@@ -35,7 +48,8 @@ export interface FileResult {
 
 export interface ReportOptions {
   baselineCase: string
-  minRatio: number
+  /** Minimum speed vs the baseline, in percent; undefined reports without a gate. */
+  minRatio?: number
   title: string
   details: CommentDetails
 }
@@ -44,6 +58,19 @@ export interface ReportOptions {
 export function parseCommentDetails(value: string): CommentDetails {
   if (value === 'collapsed' || value === 'open' || value === 'none') return value
   throw new Error(`bench-action: comment-details must be collapsed, open or none (got "${value}")`)
+}
+
+/**
+ * Validates the `min-ratio` input: empty means report only, with no gate; any
+ * other value must be a positive percent.
+ */
+export function parseMinRatio(value: string): number | undefined {
+  if (value === '') return undefined
+  const minRatio = Number(value)
+  if (!Number.isFinite(minRatio) || minRatio <= 0) {
+    throw new Error('bench-action: min-ratio must be a positive number (percent)')
+  }
+  return minRatio
 }
 
 /**
@@ -81,23 +108,37 @@ interface SummaryRow {
   avg?: number
 }
 
+/** Whether a run left numbers to compare: results with a baseline found. */
+const hasResults = ({ json }: FileResult): boolean => json?.baseline !== undefined
+
+/**
+ * The files that fail the job: a failed run (a gate breach or a crash), or a
+ * run that left no results to compare. In report-only mode only the latter two
+ * can happen.
+ */
+export function failedFiles(results: FileResult[]): string[] {
+  return results.filter((result) => !result.passed || !hasResults(result)).map(({ file }) => file)
+}
+
 /**
  * One row per non-baseline case of every file. A file without usable results
- * gets one `no results` row, and a failed file none of whose cases is below
- * the minimum (e.g. a case crashed) gets a `run failed` row, so a failure is
- * never missing from the summary.
+ * gets one failed `no results` row, and a failed file none of whose cases is
+ * below the minimum (e.g. a case crashed) gets a `run failed` row, so a failure
+ * is never missing from the summary. Without a minimum, no case fails for being
+ * slow.
  */
-function summaryRows(results: FileResult[], minRatio: number): SummaryRow[] {
-  return results.flatMap(({ file, passed, json }) => {
-    const baseline = json?.baseline
-    if (json === undefined || baseline === undefined) {
-      return [{ failed: !passed, label: '_no results_', file }]
+function summaryRows(results: FileResult[], minRatio: number | undefined): SummaryRow[] {
+  return results.flatMap((result) => {
+    const { file, passed, json } = result
+    if (json === undefined || !hasResults(result)) {
+      return [{ failed: true, label: '_no results_', file }]
     }
     const rows: SummaryRow[] = json.cases
-      .filter(({ key }) => key !== baseline)
+      .filter(({ key }) => key !== json.baseline)
       .map(({ key, avg, ratioPct }) => {
         const ratio = ratioPct as number
-        return { failed: ratio < minRatio, label: `\`${key}\``, file, ratioPct: ratio, avg }
+        const failed = minRatio !== undefined && ratio < minRatio
+        return { failed, label: `\`${key}\``, file, ratioPct: ratio, avg }
       })
     if (!passed && !rows.some((row) => row.failed)) {
       rows.push({ failed: true, label: '_run failed_', file })
@@ -120,6 +161,15 @@ function summaryTable(rows: SummaryRow[]): string {
   return [...header, ...body].join('\n')
 }
 
+/** One line naming what produced the run, the same as bench's own header line. */
+function envLine(env: BenchEnv): string {
+  const parts = [`soroush-bench ${env.bench}`, `node ${env.node}`]
+  if (env.cpus !== undefined) parts.push(`cpus ${env.cpus}`)
+  if (env.cpuset !== undefined) parts.push(`cpuset ${env.cpuset}`)
+  if (env.memory !== undefined) parts.push(`memory ${env.memory}`)
+  return parts.join(' · ')
+}
+
 function fileSection({ file, passed, table }: FileResult, open: boolean): string {
   const status = passed ? '✅ passed' : '❌ failed'
   const body = table === '' ? '_no results table was produced_' : table
@@ -139,10 +189,17 @@ export function buildReport(results: FileResult[], options: ReportOptions): stri
   const { baselineCase, minRatio, title, details } = options
   const rows = summaryRows(results, minRatio)
   const failed = rows.filter((row) => row.failed).length
+  const mode =
+    minRatio === undefined
+      ? 'report only, no gate'
+      : `minimum speed ratio: **${minRatio}%** · **${failed} of ${rows.length}** failed`
+  // Every file in one job runs on the same harness and limits, so the first env stands for all.
+  const env = results.find(({ json }) => json?.env !== undefined)?.json?.env
   const head = [
     commentMarker(title),
     `## ${title}`,
-    `Baseline case: \`${baselineCase}\` · minimum speed ratio: **${minRatio}%** · **${failed} of ${rows.length}** failed`,
+    `Baseline case: \`${baselineCase}\` · ${mode}`,
+    ...(env === undefined ? [] : [envLine(env)]),
     summaryTable(rows),
   ]
   const sections =

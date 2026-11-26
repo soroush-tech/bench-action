@@ -18,7 +18,7 @@ export interface CliOptions {
   jsonFile?: string
   rounds: number
   gcInner: boolean
-  /** Case key the ratio gate compares every other case against. */
+  /** Case key every other case is compared against; with `minRatio`, the ratio gate. */
   baselineCase?: string
   /** Minimum speed vs the baseline, in percent; below it the run fails. */
   minRatio?: number

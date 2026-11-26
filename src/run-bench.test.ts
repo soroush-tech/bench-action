@@ -55,6 +55,14 @@ describe('runBenchFile', () => {
     expect(runArgs).toEqual(expect.arrayContaining(['-v', `/tmp/out:${OUT_MOUNT}`]))
   })
 
+  it('passes --baseline-case without --min-ratio in report-only mode', async () => {
+    const exec = vi.fn().mockResolvedValue(0)
+    await runBenchFile({ ...spec, minRatio: undefined }, exec)
+    const runArgs = exec.mock.calls[1][1] as string[]
+    expect(runArgs).toEqual(expect.arrayContaining(['--baseline-case', 'previous']))
+    expect(runArgs).not.toContain('--min-ratio')
+  })
+
   it('reports a failed run (gate breach) instead of throwing', async () => {
     const exec = vi.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(1)
     await expect(runBenchFile(spec, exec)).resolves.toEqual({ passed: false })

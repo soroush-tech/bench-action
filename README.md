@@ -4,7 +4,8 @@ Compiled GitHub Action that runs a directory of
 [`@soroush.tech/bench`](https://www.npmjs.com/package/@soroush.tech/bench)
 `*.bench.ts` files inside the CPU/RAM-pinned Docker sandbox, **fails CI** when
 any case drops below a minimum speed ratio vs a baseline case, and posts the
-results as a single sticky **PR comment** (updated in place on every push).
+results as a single sticky **PR comment** (updated in place on every push)
+and in the run's **job summary**.
 Listed on the GitHub Marketplace as
 **[soroush-bench](https://github.com/marketplace/actions/soroush-bench)** —
 the same name as the [bench GitHub App](https://github.com/apps/soroush-bench)
@@ -57,6 +58,41 @@ case's mean time is compared against it: a case whose speed ratio
 file, and any failed file fails the action. With `min-ratio: '80'`, anything
 slower than 1.25× the baseline fails.
 
+### Reporting without a gate
+
+Leave `min-ratio` out and the action reports the ratios without failing on
+them - for a release run, say, which compares versions but must never fail on
+speed. Only a run that crashed, or one that left no results to compare (e.g. a
+`baseline-case` that matches no case), still fails the job. With no pull
+request there is no comment; the report goes to the job summary, which every
+run writes, and to the `report` output:
+
+```yaml
+on:
+  release:
+    types: [published]
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: soroush-tech/bench-action@v1
+        with:
+          bench-dir: bench
+          baseline-case: previous
+          rounds: '5'
+```
+
+### What produced the numbers
+
+Under its head line, the report names the bench version, Node version and
+sandbox limits the numbers came from, for example
+`soroush-bench 2.4.0 · node v24.22.3 · cpus 1 · cpuset 0 · memory 512m`. Two
+reports are comparable when this line matches.
+
 To gate against "the last published version of my package", declare the
 baseline via npm's `latest` dist-tag inside the bench file — no version lookup
 step needed:
@@ -82,7 +118,7 @@ export default defineBench({
 | `bench-dir`     | yes      | Directory of `*.bench.ts` files, relative to the workspace root.                                        |
 | `files`         | no       | Newline- or comma-separated subset (names with or without `.bench.ts`) to run instead of the whole dir. |
 | `baseline-case` | yes      | Case key every other case is compared against (matched like the bench CLI's `--baseline-case`).         |
-| `min-ratio`     | yes      | Minimum speed vs the baseline, in percent.                                                              |
+| `min-ratio`     | no       | Minimum speed vs the baseline, in percent. Empty (the default) reports without a gate.                  |
 | `rounds`        | no       | Median-of-N rounds per suite — recommended on shared runners to cancel noise.                           |
 | `cpus`          | no       | Sandbox CPU quota (`docker --cpus`; bench default `1`).                                                 |
 | `cpuset`        | no       | CPU pin (`docker --cpuset-cpus`; bench default `0`).                                                    |
@@ -96,7 +132,7 @@ export default defineBench({
 
 | Output   | Meaning                                                  |
 | -------- | -------------------------------------------------------- |
-| `report` | The combined markdown report (also the PR comment body). |
+| `report` | The combined markdown report (also the PR comment body and the job summary). |
 
 ## Development
 

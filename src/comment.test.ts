@@ -5,8 +5,10 @@ import {
   MAX_COMMENT_LENGTH,
   buildReport,
   commentMarker,
+  failedFiles,
   findReportComment,
   parseCommentDetails,
+  parseMinRatio,
   type FileResult,
   type ReportOptions,
 } from './comment'
@@ -63,6 +65,23 @@ describe('parseCommentDetails', () => {
   })
 })
 
+describe('parseMinRatio', () => {
+  it('reads an empty value as report only, with no gate', () => {
+    expect(parseMinRatio('')).toBeUndefined()
+  })
+
+  it('accepts a positive percent', () => {
+    expect(parseMinRatio('80')).toBe(80)
+    expect(parseMinRatio('62.5')).toBe(62.5)
+  })
+
+  it.each(['0', '-5', 'eighty', ' '])('rejects %j', (value) => {
+    expect(() => parseMinRatio(value)).toThrow(
+      'bench-action: min-ratio must be a positive number (percent)'
+    )
+  })
+})
+
 describe('commentMarker', () => {
   it('keeps the unkeyed marker for the default title', () => {
     expect(commentMarker(DEFAULT_TITLE)).toBe(COMMENT_MARKER)
@@ -103,7 +122,7 @@ describe('buildReport', () => {
     ])
   })
 
-  it('gives a file without usable results one row, failed or not', () => {
+  it('gives a file without usable results one failed row, even when its run passed', () => {
     const rows = summaryRows(
       buildReport(
         [
@@ -116,8 +135,8 @@ describe('buildReport', () => {
     )
     expect(rows).toEqual([
       '| ❌ | _no results_ | `bench/a.bench.ts` | - | - |',
+      '| ❌ | _no results_ | `bench/b.bench.ts` | - | - |',
       '| ❌ | _no results_ | `bench/c.bench.ts` | - | - |',
-      '| ✅ | _no results_ | `bench/b.bench.ts` | - | - |',
     ])
   })
 
@@ -131,6 +150,54 @@ describe('buildReport', () => {
       '| ❌ | `emotion` | `bench/merge.bench.ts` | 76.9% | 10.40 µs |',
     ])
     expect(rows.filter((row) => row.includes('_run failed_'))).toHaveLength(1)
+  })
+
+  describe('report only (no min-ratio)', () => {
+    const reportOnly = { ...options, minRatio: undefined }
+
+    it('says there is no gate, with no failure count', () => {
+      const report = buildReport([merge, parse], reportOnly)
+      expect(report).toContain('Baseline case: `previous` · report only, no gate\n')
+      expect(report).not.toContain('failed**')
+    })
+
+    it('marks no case failed for being slow, still sorting slowest first', () => {
+      const passing = { ...merge, passed: true }
+      expect(summaryRows(buildReport([passing], reportOnly))).toEqual([
+        '| ✅ | `styled` | `bench/merge.bench.ts` | 0.4% | 2.00 ms |',
+        '| ✅ | `local` | `bench/merge.bench.ts` | 69.6% | 11.50 µs |',
+        '| ✅ | `emotion` | `bench/merge.bench.ts` | 76.9% | 10.40 µs |',
+      ])
+    })
+
+    it('still marks a crashed run and a file with no results failed', () => {
+      const crashed: FileResult = { ...parse, file: 'bench/crash.bench.ts', passed: false }
+      const empty: FileResult = { file: 'bench/empty.bench.ts', passed: true, table: '' }
+      const rows = summaryRows(buildReport([crashed, empty], reportOnly))
+      expect(rows.filter((row) => row.startsWith('| ❌'))).toEqual([
+        '| ❌ | _run failed_ | `bench/crash.bench.ts` | - | - |',
+        '| ❌ | _no results_ | `bench/empty.bench.ts` | - | - |',
+      ])
+    })
+  })
+
+  it('names what produced the run under the baseline line, from the first file that says', () => {
+    const env = { bench: '2.4.0', node: 'v24.22.3', cpus: 1, cpuset: '0', memory: '512m' }
+    const withEnv = { ...parse, json: { ...parse.json!, env } }
+    const report = buildReport([merge, withEnv], options)
+    expect(report).toContain(
+      '**3 of 5** failed\n\nsoroush-bench 2.4.0 · node v24.22.3 · cpus 1 · cpuset 0 · memory 512m\n\n|'
+    )
+  })
+
+  it('leaves out the limits the env does not record', () => {
+    const env = { bench: '2.4.0', node: 'v24.22.3' }
+    const report = buildReport([{ ...parse, json: { ...parse.json!, env } }], options)
+    expect(report).toContain('\n\nsoroush-bench 2.4.0 · node v24.22.3\n\n')
+  })
+
+  it('has no env line when no result records one', () => {
+    expect(buildReport([merge, parse], options)).not.toContain('soroush-bench ')
   })
 
   it('folds each file table into a collapsed <details> by default', () => {
@@ -166,6 +233,22 @@ describe('buildReport', () => {
     expect(report).not.toContain('<details')
     expect(report).toContain('| ✅ | `local` | `bench/parse.bench.ts` | 96.2% | 520 ns |')
     expect(report).toContain('_The per-file tables were left out')
+  })
+})
+
+describe('failedFiles', () => {
+  it('lists failed runs and runs without results, in order', () => {
+    const empty: FileResult = { file: 'bench/empty.bench.ts', passed: true, table: '' }
+    const noBaseline: FileResult = { ...empty, file: 'bench/typo.bench.ts', json: { cases: [] } }
+    expect(failedFiles([merge, parse, empty, noBaseline])).toEqual([
+      'bench/merge.bench.ts',
+      'bench/empty.bench.ts',
+      'bench/typo.bench.ts',
+    ])
+  })
+
+  it('is empty when every run passed with results', () => {
+    expect(failedFiles([parse])).toEqual([])
   })
 })
 

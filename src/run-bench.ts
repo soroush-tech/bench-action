@@ -18,7 +18,8 @@ export interface RunSpec {
   /** Writable host directory mounted at {@link OUT_MOUNT} for `--md-file` and `--json-file`. */
   outDir: string
   baselineCase: string
-  minRatio: number
+  /** Minimum speed vs the baseline, in percent; undefined reports without a gate. */
+  minRatio?: number
   rounds?: number
   cpus?: number
   cpuset?: string
