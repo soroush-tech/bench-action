@@ -22,6 +22,9 @@ const opts: SandboxOptions = {
   gcInner: false,
 }
 
+/** The `--sandbox-env` value for {@link opts}. */
+const SANDBOX_ENV = '{"cpus":1,"cpuset":"0","memory":"512m"}'
+
 describe('buildImageArgs', () => {
   it('builds the image from the context dir under the tag', () => {
     expect(buildImageArgs(opts)).toEqual(['build', '-t', 'soroush-bench:latest', '/pkg'])
@@ -53,13 +56,15 @@ describe('buildRunArgs', () => {
       'tsx',
       '/app/dist/harness.mjs',
       '/repo/bench/clone.bench.ts',
+      '--sandbox-env',
+      SANDBOX_ENV,
     ])
   })
 
   it('appends --md after the bench file when md is set', () => {
     const args = buildRunArgs({ ...opts, md: true })
     expect(args[args.length - 1]).toBe('--md')
-    expect(args[args.length - 2]).toBe('/repo/bench/clone.bench.ts')
+    expect(args.slice(-4, -1)).toEqual(['/repo/bench/clone.bench.ts', '--sandbox-env', SANDBOX_ENV])
   })
 
   it('omits --md when md is unset', () => {

@@ -36,7 +36,7 @@ export interface SandboxOptions {
   rounds: number
   /** Run GC before each iteration (mitata `gc('inner')`) for a per-iter GC row. */
   gcInner: boolean
-  /** Case key the ratio gate compares every other case against. */
+  /** Case key every other case is compared against; with `minRatio`, the ratio gate. */
   baselineCase?: string
   /** Minimum speed vs the baseline, in percent; below it the run exits non-zero. */
   minRatio?: number
@@ -78,6 +78,9 @@ export function buildRunArgs(opts: SandboxOptions): string[] {
     'tsx',
     '/app/dist/harness.mjs',
     `/repo/${opts.benchRelPath}`,
+    // The sandbox limits, which the harness records in the results' `env`.
+    '--sandbox-env',
+    JSON.stringify({ cpus: opts.cpus, cpuset: opts.cpuset, memory: opts.memory }),
     ...(opts.md ? ['--md'] : []),
     ...(opts.mdFile !== undefined ? ['--md-file', opts.mdFile] : []),
     ...(opts.jsonFile !== undefined ? ['--json-file', opts.jsonFile] : []),

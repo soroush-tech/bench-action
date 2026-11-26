@@ -9,14 +9,17 @@ import {
   DEFAULT_TITLE,
   buildReport,
   commentMarker,
+  failedFiles,
   findReportComment,
   parseCommentDetails,
+  parseMinRatio,
   type BenchJson,
   type FileResult,
 } from './comment'
 import { parseFilesInput, selectBenchFiles } from './discover'
 import { postViaRelay } from './relay'
 import { resultFileName, runBenchFile } from './run-bench'
+import { writeJobSummary } from './summary'
 
 /** Real process runner: inherits stdio so Docker/mitata output streams through. */
 const exec: Exec = (command, args) =>
@@ -95,10 +98,8 @@ async function upsertComment(
 async function main(): Promise<void> {
   const benchDir = core.getInput('bench-dir', { required: true })
   const baselineCase = core.getInput('baseline-case', { required: true })
-  const minRatio = Number(core.getInput('min-ratio', { required: true }))
-  if (!Number.isFinite(minRatio) || minRatio <= 0) {
-    throw new Error('bench-action: min-ratio must be a positive number (percent)')
-  }
+  // Empty: report only - ratios are computed and no case fails for being slow.
+  const minRatio = parseMinRatio(core.getInput('min-ratio'))
   // Validated before any bench runs, so a typo fails fast instead of after the suite.
   const details = parseCommentDetails(core.getInput('comment-details') || 'collapsed')
   const title = core.getInput('comment-title') || DEFAULT_TITLE
@@ -159,6 +160,7 @@ async function main(): Promise<void> {
 
   const report = buildReport(results, { baselineCase, minRatio, title, details })
   core.setOutput('report', report)
+  await writeJobSummary(core.summary, report, (message) => core.warning(message))
   try {
     await postReport(report, marker)
   } catch (error) {
@@ -168,11 +170,10 @@ async function main(): Promise<void> {
     )
   }
 
-  const failed = results.filter((result) => !result.passed)
+  const failed = failedFiles(results)
   if (failed.length > 0) {
-    throw new Error(
-      `benchmark target (min ratio ${minRatio}%) failed: ${failed.map((r) => r.file).join(', ')}`
-    )
+    const what = minRatio === undefined ? 'benchmark run' : `benchmark target (min ratio ${minRatio}%)`
+    throw new Error(`${what} failed: ${failed.join(', ')}`)
   }
 }
 
