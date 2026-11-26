@@ -109,7 +109,7 @@ tag's commit, so `main` stays TypeScript-only.
 `vendor/` holds `@soroush.tech/bench`'s sandbox `Dockerfile` and its
 self-contained harness bundle, copied from the pinned devDependency by
 `npm run vendor`. To pick up a new bench release, bump the
-`@soroush.tech/bench` version in `package.json` (needs >= 2.1.0), then:
+`@soroush.tech/bench` version in `package.json` (needs >= 2.3.0), then:
 
 ```sh
 npm install
