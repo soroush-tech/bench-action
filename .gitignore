@@ -13,3 +13,5 @@ coverage
 .idea
 .claude/*
 CLAUDE.md
+# Reports the E2E workflow saves (and local runs of it).
+/e2e-out/

@@ -14,7 +14,11 @@
     "vendor": "node scripts/vendor.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts"
+  },
+  "benchAction": {
+    "minBench": "2.3.0"
   },
   "dependencies": {
     "@actions/core": "^1.11.1",
