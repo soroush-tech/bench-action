@@ -145,7 +145,7 @@ tag's commit, so `main` stays TypeScript-only.
 `vendor/` holds `@soroush.tech/bench`'s sandbox `Dockerfile` and its
 self-contained harness bundle, copied from the pinned devDependency by
 `npm run vendor`. To pick up a new bench release, bump the
-`@soroush.tech/bench` version in `package.json` (needs >= 2.3.0), then:
+`@soroush.tech/bench` version in `package.json`, then:
 
 ```sh
 npm install
@@ -154,6 +154,22 @@ npm run vendor
 
 The small sandbox-driving modules in `src/sandbox/` mirror bench's
 `docker.ts`/`cli.ts` — diff them against the new release when re-vendoring.
+
+The oldest bench the action supports is `benchAction.minBench` in
+`package.json` (today 2.3.0, the first whose harness writes `--json-file`);
+`npm run vendor` refuses anything older.
+
+The **E2E** workflow (`.github/workflows/e2e.yml`) runs the built action with
+`uses: ./` on the fixture in `e2e/fixture/bench`, in Docker, once per bench
+version as its sandbox: `minBench`, the pinned one and the latest on npm. Each
+row runs it report-only and gated at 80%, and `e2e/run.e2e.ts` checks the
+reports: a ratio for every case, the verdicts, and the env line. Then
+`e2e/consistency.e2e.ts` checks every version against the pinned one: the same
+case order and verdicts, and ratios within ±25%. It runs on pull requests, on
+`main` and weekly, so a bench release that breaks the action shows up even
+with no pull request open. To run the checks on reports of your own, save them
+as `e2e-out/<version>/{report-only,gate}.md` and run
+`BENCH_VERSION=<version> GATE_OUTCOME=failure npm run test:e2e -- e2e/run.e2e.ts`.
 
 Bench-file `options.sandbox` defaults are **not** read by the action (that is
 a host-CLI convenience); sandbox settings come from the inputs above.

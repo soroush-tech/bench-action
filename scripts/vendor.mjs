@@ -7,6 +7,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { MIN_BENCH, atLeast } from './versions.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const bench = join(root, 'node_modules', '@soroush.tech', 'bench')
@@ -16,13 +17,16 @@ if (!existsSync(join(bench, 'Dockerfile'))) {
   process.exit(1)
 }
 
-// The action passes --json-file and builds its summary from that file. A harness
-// older than bench 2.3.0 ignores the flag, so every file would report no results.
-const harness = join(bench, 'dist', 'harness.mjs')
-if (!readFileSync(harness, 'utf8').includes('--json-file')) {
-  console.error('vendor: the pinned @soroush.tech/bench has no --json-file support — pin 2.3.0 or later.')
+// An older harness lacks what the action relies on: before 2.3.0 it ignores
+// --json-file, so every file would report no results (as v1.2.0 shipped).
+const { version } = JSON.parse(readFileSync(join(bench, 'package.json'), 'utf8'))
+if (!atLeast(version, MIN_BENCH)) {
+  console.error(
+    `vendor: @soroush.tech/bench ${version} is older than ${MIN_BENCH}, the oldest the action supports (benchAction.minBench).`
+  )
   process.exit(1)
 }
+const harness = join(bench, 'dist', 'harness.mjs')
 
 mkdirSync(join(root, 'vendor', 'dist'), { recursive: true })
 copyFileSync(join(bench, 'Dockerfile'), join(root, 'vendor', 'Dockerfile'))

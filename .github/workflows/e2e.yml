@@ -1,0 +1,158 @@
+name: E2E
+
+# Runs the built action as a consumer would (`uses: ./`), in Docker, on a
+# fixture bench, once per supported bench version as its sandbox: the oldest
+# supported, the pinned one (what the next release ships) and the latest on
+# npm (what the next re-vendor would ship). Unit tests mock the sandbox, so
+# only this proves that the bundle and a harness produce results together -
+# v1.2.0 shipped a pair that didn't. The weekly run catches a new bench
+# release that breaks the action while no pull request is open.
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  versions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.versions.outputs.matrix }}
+      pinned: ${{ steps.versions.outputs.pinned }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: List the bench versions to run on
+        id: versions
+        run: node scripts/bench-versions.mjs >> "$GITHUB_OUTPUT"
+
+  e2e:
+    name: e2e (bench ${{ matrix.bench }})
+    needs: versions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        bench: ${{ fromJSON(needs.versions.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      # --ignore-scripts: no dependency here needs lifecycle scripts.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
+
+      # Only the sandbox changes per row. The action's own code - src/sandbox
+      # included - stays at the pinned bench, as a release would run it. The
+      # sandbox needs only the package's own files (its harness is a
+      # self-contained bundle), so a row fetches that one tarball at its exact
+      # version - integrity-checked by npm - unpacks it over the pinned one and
+      # installs no dependencies.
+      - name: Use bench ${{ matrix.bench }} as the sandbox
+        if: matrix.bench != needs.versions.outputs.pinned
+        env:
+          BENCH: ${{ matrix.bench }}
+        run: |
+          npm pack --silent --pack-destination "$RUNNER_TEMP" "@soroush.tech/bench@$BENCH"
+          rm -rf node_modules/@soroush.tech/bench
+          mkdir node_modules/@soroush.tech/bench
+          tar -xzf "$RUNNER_TEMP/soroush.tech-bench-$BENCH.tgz" --strip-components=1 -C node_modules/@soroush.tech/bench
+
+      - name: Vendor the sandbox
+        run: npm run vendor
+
+      # github-token '' on both runs: CI never posts a PR comment.
+      - name: Run the action, report only
+        id: report-only
+        uses: ./
+        with:
+          bench-dir: e2e/fixture/bench
+          baseline-case: baseline
+          rounds: '3'
+          github-token: ''
+
+      - name: Run the action, gated at 80%
+        id: gate
+        continue-on-error: true
+        uses: ./
+        with:
+          bench-dir: e2e/fixture/bench
+          baseline-case: baseline
+          min-ratio: '80'
+          rounds: '3'
+          github-token: ''
+
+      # Kept even when a run failed, so its report can be read from the artifact.
+      - name: Save the reports
+        if: ${{ !cancelled() }}
+        env:
+          BENCH: ${{ matrix.bench }}
+          REPORT_ONLY: ${{ steps.report-only.outputs.report }}
+          GATE: ${{ steps.gate.outputs.report }}
+        run: |
+          mkdir -p "e2e-out/$BENCH"
+          printf '%s\n' "$REPORT_ONLY" > "e2e-out/$BENCH/report-only.md"
+          printf '%s\n' "$GATE" > "e2e-out/$BENCH/gate.md"
+
+      - name: Check the reports
+        env:
+          BENCH_VERSION: ${{ matrix.bench }}
+          GATE_OUTCOME: ${{ steps.gate.outcome }}
+        run: npm run test:e2e -- e2e/run.e2e.ts
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: e2e-reports-${{ matrix.bench }}
+          path: e2e-out/
+
+  consistency:
+    needs: [versions, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: e2e-reports-*
+          path: e2e-out/
+          merge-multiple: true
+
+      - name: Compare the versions
+        env:
+          PINNED: ${{ needs.versions.outputs.pinned }}
+        run: npm run test:e2e -- e2e/consistency.e2e.ts
