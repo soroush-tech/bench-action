@@ -62,19 +62,26 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      # Only the sandbox changes per row. The action's own code - src/sandbox
-      # included - stays at the pinned bench, as a release would run it.
-      - name: Use bench ${{ matrix.bench }} as the sandbox
-        if: matrix.bench != needs.versions.outputs.pinned
-        env:
-          BENCH: ${{ matrix.bench }}
-        run: npm install --no-save --ignore-scripts "@soroush.tech/bench@$BENCH"
-
       - name: Build
         run: npm run build
 
+      # Only the sandbox changes per row. The action's own code - src/sandbox
+      # included - stays at the pinned bench, as a release would run it. The
+      # sandbox needs only the package's own files (its harness is a
+      # self-contained bundle), so a row fetches that one tarball at its exact
+      # version - integrity-checked by npm - and installs no dependencies.
+      - name: Fetch bench ${{ matrix.bench }}
+        if: matrix.bench != needs.versions.outputs.pinned
+        env:
+          BENCH: ${{ matrix.bench }}
+        run: |
+          npm pack --silent --pack-destination "$RUNNER_TEMP" "@soroush.tech/bench@$BENCH"
+          tar -xzf "$RUNNER_TEMP/soroush.tech-bench-$BENCH.tgz" -C "$RUNNER_TEMP"
+          echo "BENCH_DIR=$RUNNER_TEMP/package" >> "$GITHUB_ENV"
+
+      # BENCH_DIR unset (the pinned row): vendors from node_modules, as a release does.
       - name: Vendor the sandbox
-        run: npm run vendor
+        run: npm run vendor -- ${BENCH_DIR:+"$BENCH_DIR"}
 
       # github-token '' on both runs: CI never posts a PR comment.
       - name: Run the action, report only
